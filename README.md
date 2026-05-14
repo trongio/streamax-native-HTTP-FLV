@@ -7,6 +7,25 @@ player vendors ship for the web.
 A shared Rust core does the FLV demuxing once; thin platform wrappers feed
 hardware decoders (VideoToolbox / MediaCodec / DXVA via libVLC).
 
+## Visual walkthrough
+
+A full HTML walkthrough with tabbed build instructions for each platform lives
+at [`docs/index.html`](docs/index.html). Open it locally:
+
+```bash
+xdg-open docs/index.html     # Linux
+open docs/index.html         # macOS
+start docs\index.html        # Windows
+```
+
+Preview:
+
+[![Walkthrough preview](docs/preview.png)](docs/index.html)
+
+*Click the image to open the interactive version (tabs and tables are powered
+by Alpine.js — they only work in a real browser, not in GitHub's image
+preview).*
+
 ## Why this exists
 
 The web client these cameras ship with is a `streamaxPlayer` WebAssembly
