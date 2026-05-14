@@ -50,6 +50,19 @@ void             streamax_demuxer_append(StreamaxDemuxer* d, const uint8_t* data
 /* Returns 1 if an event was written into *out, 0 if no event is pending. */
 uint8_t          streamax_demuxer_next_event(StreamaxDemuxer* d, StreamaxEvent* out);
 
+/* MPEG-TS muxing. Call set_ts_mode(d, 1) once after _new, then drive with
+ * _append + _next_ts. Useful for hosts (libVLC, gstreamer) that prefer a
+ * multiplexed container over raw HEVC + AAC elementary streams.
+ *
+ * _next_ts returns 1 on data (*out_data / *out_len point to a buffer owned
+ * by the demuxer, valid until the next FFI call), 0 if nothing's ready, or
+ * 2 if the underlying demuxer hit an error (UTF-8 text in *out_data).
+ */
+void             streamax_demuxer_set_ts_mode(StreamaxDemuxer* d, uint8_t enable);
+uint8_t          streamax_demuxer_next_ts(StreamaxDemuxer* d,
+                                          const uint8_t** out_data,
+                                          size_t* out_len);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

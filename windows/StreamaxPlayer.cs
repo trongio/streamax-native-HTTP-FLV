@@ -12,15 +12,10 @@ using LibVLCSharp.Shared;
 namespace StreamaxDemo;
 
 /// <summary>
-/// Live HTTP-FLV player. Demux in Rust (streamax-core), HEVC playback via
-/// libVLC. Reconnects with exponential backoff. Supports SPKI pinning.
-///
-/// AUDIO: this build is video-only on Windows. AAC audio extraction works
-/// (the Rust core hands us AudioConfig + AudioFrame events) but libVLC
-/// can't multiplex two raw elementary streams. To enable audio:
-///   (a) extend streamax-core with an MPEG-TS muxer (HEVC + AAC → TS),
-///   (b) replace `:demux=hevc` with the TS feed.
-/// See the chat notes for the design.
+/// Live HTTP-FLV player. Demux + MPEG-TS mux in Rust (streamax-core);
+/// libVLC consumes the multiplexed TS stream → hardware HEVC decode and
+/// AAC audio playback in one pipeline. Reconnects with exponential
+/// backoff. Supports SPKI pinning.
 /// </summary>
 public sealed class StreamaxPlayer : IDisposable
 {
@@ -96,7 +91,9 @@ public sealed class StreamaxPlayer : IDisposable
         var cts = new CancellationTokenSource();
         _cts = cts;
         _videoStream = new HevcStream();
-        _media = new Media(_libVlc, new StreamMediaInput(_videoStream), ":demux=hevc");
+        // Multiplexed MPEG-TS — libVLC handles HEVC + AAC + A/V sync.
+        _core.EnableTsMode();
+        _media = new Media(_libVlc, new StreamMediaInput(_videoStream), ":demux=ts");
         MediaPlayer.Play(_media);
 
         try
@@ -116,7 +113,7 @@ public sealed class StreamaxPlayer : IDisposable
                 int n = await body.ReadAsync(buf.AsMemory(0, buf.Length), cts.Token);
                 if (n <= 0) break;
                 _core.Append(buf.AsSpan(0, n));
-                DrainEvents();
+                DrainTs();
             }
         }
         catch (OperationCanceledException) { return; }
@@ -129,30 +126,15 @@ public sealed class StreamaxPlayer : IDisposable
         if (!cts.IsCancellationRequested) ScheduleReconnect();
     }
 
-    private void DrainEvents()
+    private void DrainTs()
     {
+        // Drain demuxer events through the muxer; pull TS bytes; feed libVLC.
+        // We also peek at video-size events out-of-band to surface them.
         while (true)
         {
-            var ev = _core.NextEvent();
-            if (ev == null) break;
-            switch (ev)
-            {
-                case StreamaxCore.VideoConfig vc:
-                    VideoSizeChanged?.Invoke(vc.Width, vc.Height);
-                    _videoStream?.Push(vc.AnnexB);
-                    break;
-                case StreamaxCore.VideoFrame vf:
-                    _videoStream?.Push(vf.AnnexB);
-                    break;
-                case StreamaxCore.AudioConfig _:
-                case StreamaxCore.AudioFrame _:
-                    // See class doc — audio path not wired on Windows yet.
-                    break;
-                case StreamaxCore.Error err:
-                    ErrorOccurred?.Invoke(err.Message);
-                    SetState(PlayerState.Error);
-                    break;
-            }
+            var chunk = _core.NextTsChunk();
+            if (chunk == null) break;
+            _videoStream?.Push(chunk);
         }
     }
 

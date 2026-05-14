@@ -16,6 +16,7 @@
 //! invalidated by the next call to `next_event` / `append` / `free`.
 
 use crate::flv::{Demuxer, Event};
+use crate::mpegts::Muxer;
 use std::os::raw::c_void;
 
 #[repr(C)]
@@ -72,6 +73,10 @@ pub struct Handle {
     demuxer: Demuxer,
     last_buf: Vec<u8>,
     last_err: Option<std::ffi::CString>,
+    /// Optional MPEG-TS muxer. When [`streamax_demuxer_set_ts_mode`] enables
+    /// it, the host pulls TS bytes via [`streamax_demuxer_next_ts`] instead
+    /// of (or in addition to) events.
+    ts: Option<Muxer>,
 }
 
 #[no_mangle]
@@ -80,8 +85,72 @@ pub extern "C" fn streamax_demuxer_new() -> *mut c_void {
         demuxer: Demuxer::new(),
         last_buf: Vec::new(),
         last_err: None,
+        ts: None,
     });
     Box::into_raw(h) as *mut c_void
+}
+
+/// Enable / disable MPEG-TS muxing. When enabled, the host should call
+/// [`streamax_demuxer_next_ts`] after each append to drain TS bytes.
+/// `enable != 0` turns it on; `0` turns it off and discards any pending mux state.
+#[no_mangle]
+pub unsafe extern "C" fn streamax_demuxer_set_ts_mode(handle: *mut c_void, enable: u8) {
+    if let Some(h) = (handle as *mut Handle).as_mut() {
+        h.ts = if enable != 0 { Some(Muxer::new()) } else { None };
+    }
+}
+
+/// Drains events into the muxer and returns the muxed bytes (if any). The
+/// returned pointer is valid until the next call into the demuxer. Returns
+/// data_len = 0 when nothing is ready yet (caller should append more bytes).
+///
+/// Requires [`streamax_demuxer_set_ts_mode`] to have enabled TS mode first.
+#[no_mangle]
+pub unsafe extern "C" fn streamax_demuxer_next_ts(
+    handle: *mut c_void,
+    out_data: *mut *const u8,
+    out_len: *mut usize,
+) -> u8 {
+    let h = match (handle as *mut Handle).as_mut() {
+        Some(h) => h,
+        None => return 0,
+    };
+    if out_data.is_null() || out_len.is_null() {
+        return 0;
+    }
+    let Some(muxer) = h.ts.as_mut() else {
+        return 0;
+    };
+
+    while let Some(ev) = h.demuxer.next_event() {
+        match ev {
+            Event::VideoConfig { annex_b, .. } => muxer.push_video_config(&annex_b),
+            Event::VideoFrame { annex_b, pts_ms, is_keyframe } => {
+                muxer.push_video_frame(&annex_b, pts_ms, is_keyframe);
+            }
+            Event::AudioConfig { sample_rate, channels, object_type, .. } => {
+                muxer.push_audio_config(sample_rate, channels, object_type);
+            }
+            Event::AudioFrame { data, pts_ms } => muxer.push_audio_frame(&data, pts_ms),
+            Event::Error(msg) => {
+                h.last_err = std::ffi::CString::new(msg).ok();
+                *out_data = h.last_err.as_ref().map_or(std::ptr::null(), |c| c.as_ptr() as *const u8);
+                *out_len = h.last_err.as_ref().map_or(0, |c| c.as_bytes().len());
+                return 2; // signals error
+            }
+        }
+    }
+
+    let bytes = muxer.drain();
+    if bytes.is_empty() {
+        *out_data = std::ptr::null();
+        *out_len = 0;
+        return 0;
+    }
+    h.last_buf = bytes;
+    *out_data = h.last_buf.as_ptr();
+    *out_len = h.last_buf.len();
+    1
 }
 
 #[no_mangle]
@@ -98,6 +167,9 @@ pub unsafe extern "C" fn streamax_demuxer_reset(handle: *mut c_void) {
         h.demuxer.reset();
         h.last_buf.clear();
         h.last_err = None;
+        if h.ts.is_some() {
+            h.ts = Some(Muxer::new());
+        }
     }
 }
 

@@ -41,6 +41,25 @@ public sealed class StreamaxCore : IDisposable
         }
     }
 
+    /// <summary>Enable MPEG-TS muxing. After this, use NextTsChunk instead of NextEvent.</summary>
+    public void EnableTsMode()
+    {
+        if (_handle != IntPtr.Zero) streamax_demuxer_set_ts_mode(_handle, 1);
+    }
+
+    /// <summary>Returns the next MPEG-TS chunk (HEVC + AAC multiplexed) or null when empty.</summary>
+    public byte[]? NextTsChunk()
+    {
+        if (_handle == IntPtr.Zero) return null;
+        IntPtr ptr; nuint len;
+        unsafe
+        {
+            var status = streamax_demuxer_next_ts(_handle, out ptr, out len);
+            if (status == 0 || len == 0 || ptr == IntPtr.Zero) return null;
+            return CopyBytes(ptr, (int)len);
+        }
+    }
+
     public Event? NextEvent()
     {
         if (_handle == IntPtr.Zero) return null;
@@ -117,4 +136,10 @@ public sealed class StreamaxCore : IDisposable
 
     [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
     private static extern byte streamax_demuxer_next_event(IntPtr handle, ref CEvent outEvent);
+
+    [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void streamax_demuxer_set_ts_mode(IntPtr handle, byte enable);
+
+    [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+    private static extern unsafe byte streamax_demuxer_next_ts(IntPtr handle, out IntPtr outData, out nuint outLen);
 }

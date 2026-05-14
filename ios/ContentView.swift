@@ -74,12 +74,15 @@ struct ContentView: View {
 @available(iOS 14.0, *)
 final class PlayerModel: ObservableObject {
     let player = StreamaxPlayer()
-    // Pin to ship: replace with the actual SHA-256 SPKI hashes for YOUR-CAMERA-HOST.example.com.
-    // Generate via:  openssl s_client -connect YOUR-CAMERA-HOST.example.com:22060 < /dev/null \
-    //   | openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER \
-    //   | openssl dgst -sha256 -binary | openssl enc -base64
+
     init() {
-        // player.pinnedSPKIHashes = ["BASE64SHA256_OF_THE_CAMERAS_SPKI=="]
+        // SHA-256 of the SubjectPublicKeyInfo for YOUR-CAMERA-HOST.example.com:22060
+        // (Sectigo-issued cert, expires 2026-12-28). To re-pin:
+        //   openssl s_client -connect YOUR-CAMERA-HOST.example.com:22060 </dev/null 2>/dev/null \
+        //     | openssl x509 -pubkey -noout \
+        //     | openssl pkey -pubin -outform DER \
+        //     | openssl dgst -sha256 -binary | openssl base64
+        player.pinnedSPKIHashes = ["YOUR-SPKI-HASH-BASE64="]
     }
 }
 

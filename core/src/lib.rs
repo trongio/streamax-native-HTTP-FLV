@@ -20,5 +20,7 @@ mod aac;
 pub mod ffi;
 mod flv;
 mod hevc;
+pub mod mpegts;
 
 pub use flv::{Demuxer, Event};
+pub use mpegts::Muxer as TsMuxer;

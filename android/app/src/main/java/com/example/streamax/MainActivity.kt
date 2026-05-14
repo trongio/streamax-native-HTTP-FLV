@@ -1,6 +1,10 @@
 package com.example.streamax
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.activity.ComponentActivity
@@ -19,26 +23,59 @@ import androidx.compose.foundation.text.KeyboardOptions
 
 class MainActivity : ComponentActivity() {
 
+    // Latest video size, surfaced via StreamaxPlayer.StateListener.onVideoSize.
+    @Volatile private var videoAspect: Rational = Rational(16, 9)
+    val inPip: MutableState<Boolean> = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { PlayerScreen() } }
+        setContent { MaterialTheme { PlayerScreen(activity = this) } }
+    }
+
+    fun updateVideoAspect(w: Int, h: Int) {
+        if (w > 0 && h > 0) videoAspect = Rational(w, h)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Auto-enter PiP when the user presses Home while streaming.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(videoAspect)
+                .build()
+            try { enterPictureInPictureMode(params) } catch (_: Exception) {}
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip.value = isInPictureInPictureMode
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlayerScreen() {
+private fun PlayerScreen(activity: MainActivity? = null) {
     val player = remember { StreamaxPlayer() }
     var url by remember {
         mutableStateOf("https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=YOUR-DEVID&chl=1&st=1&audio=0&hash=anything")
     }
     var state by remember { mutableStateOf(StreamaxPlayer.State.IDLE) }
     var error by remember { mutableStateOf<String?>(null) }
+    val inPip = activity?.inPip?.value ?: false
 
     DisposableEffect(Unit) {
+        // SHA-256 of the SubjectPublicKeyInfo for YOUR-CAMERA-HOST.example.com:22060
+        // (Sectigo-issued cert, expires 2026-12-28). Re-pin if the cert key rotates.
+        player.certificatePinner = okhttp3.CertificatePinner.Builder()
+            .add("YOUR-CAMERA-HOST.example.com", "sha256/YOUR-SPKI-HASH-BASE64=")
+            .build()
         player.stateListener = object : StreamaxPlayer.StateListener {
             override fun onState(s: StreamaxPlayer.State) { state = s }
             override fun onError(message: String) { error = message }
+            override fun onVideoSize(width: Int, height: Int) {
+                activity?.updateVideoAspect(width, height)
+            }
         }
         onDispose {
             player.stateListener = null
@@ -48,7 +85,7 @@ private fun PlayerScreen() {
 
     Column(modifier = Modifier
         .fillMaxSize()
-        .padding(16.dp)) {
+        .padding(if (inPip) 0.dp else 16.dp)) {
 
         AndroidView(
             factory = { ctx ->
@@ -67,9 +104,12 @@ private fun PlayerScreen() {
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .then(if (inPip) Modifier.weight(1f) else Modifier.aspectRatio(16f / 9f))
                 .background(Color.Black)
         )
+
+        // PiP hides the URL field and buttons — render only the video.
+        if (inPip) return@Column
 
         Spacer(Modifier.height(12.dp))
 

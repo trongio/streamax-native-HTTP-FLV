@@ -1,0 +1,169 @@
+name: Build core
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # 1. Tests + Linux build
+  # ─────────────────────────────────────────────────────────────────
+  test-linux:
+    name: Test + Linux x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: Tests
+        working-directory: core
+        run: cargo test --release
+      - name: Build (lib + example)
+        working-directory: core
+        run: cargo build --release --lib --examples
+      - name: Stage artifact
+        run: |
+          mkdir -p out/linux-x86_64
+          cp core/target/release/libstreamax_core.{a,so} out/linux-x86_64/
+          cp core/target/release/examples/flv_to_annex_b out/linux-x86_64/
+          cp core/target/release/examples/flv_to_ts      out/linux-x86_64/
+          cp core/include/streamax_core.h                out/linux-x86_64/
+          cd out && tar -czf streamax-core-linux-x86_64.tar.gz linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: out/streamax-core-linux-x86_64.tar.gz
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. Windows DLL (cross-compiled from Linux via MinGW)
+  # ─────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Windows x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          key: windows
+      - name: Install MinGW
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+      - name: Build DLL
+        working-directory: core
+        run: cargo build --release --target x86_64-pc-windows-gnu --lib
+      - name: Stage artifact
+        run: |
+          mkdir -p out/windows-x86_64
+          cp core/target/x86_64-pc-windows-gnu/release/streamax_core.dll out/windows-x86_64/
+          cp core/include/streamax_core.h                                out/windows-x86_64/
+          cd out && zip -r streamax-core-windows-x86_64.zip windows-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: out/streamax-core-windows-x86_64.zip
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. Android jniLibs (4 ABIs)
+  # ─────────────────────────────────────────────────────────────────
+  build-android:
+    name: Android (arm64-v8a, armeabi-v7a, x86_64, x86)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          key: android
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+      - name: Install cargo-ndk
+        run: cargo install --locked cargo-ndk
+      - name: Build .so per ABI
+        working-directory: core
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cargo ndk \
+            -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 \
+            -o target/android-jniLibs \
+            build --release
+      - name: Stage artifact
+        run: |
+          mkdir -p out/android-jniLibs
+          cp -r core/target/android-jniLibs/* out/android-jniLibs/
+          cp core/include/streamax_core.h     out/android-jniLibs/
+          cd out && zip -r streamax-core-android-jniLibs.zip android-jniLibs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-jniLibs
+          path: out/streamax-core-android-jniLibs.zip
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. iOS XCFramework (macOS-only)
+  # ─────────────────────────────────────────────────────────────────
+  build-ios:
+    name: iOS XCFramework
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          key: ios
+      - name: Build XCFramework
+        working-directory: core
+        run: ./build.sh ios
+      - name: Stage artifact
+        run: |
+          mkdir -p out
+          cd core/target && zip -r ../../out/streamax-core-ios-xcframework.zip StreamaxCore.xcframework
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcframework
+          path: out/streamax-core-ios-xcframework.zip
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. Attach everything to a Release on tag push
+  # ─────────────────────────────────────────────────────────────────
+  release:
+    name: Publish release
+    needs: [test-linux, build-windows, build-android, build-ios]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${GITHUB_REF#refs/tags/}" \
+            artifacts/linux-x86_64/*.tar.gz \
+            artifacts/windows-x86_64/*.zip \
+            artifacts/android-jniLibs/*.zip \
+            artifacts/ios-xcframework/*.zip \
+            --clobber --repo "${GITHUB_REPOSITORY}"
