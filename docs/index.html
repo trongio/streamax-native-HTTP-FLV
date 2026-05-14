@@ -7,6 +7,33 @@
     <meta name="description" content="iOS, Android, Windows and Linux players for Streamax dashcam HTTP-FLV streams. Shared Rust core, hardware decoded, no WebAssembly." />
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        // Alpine component factory for copy-to-clipboard buttons.
+        // Registered before Alpine boots via alpine:init.
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('copyBlock', () => ({
+                copied: false,
+                async copy(el) {
+                    const text = el.textContent;
+                    try {
+                        await navigator.clipboard.writeText(text);
+                    } catch {
+                        // Fallback for non-secure contexts (file://, http://)
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        try { document.execCommand('copy'); } catch {}
+                        document.body.removeChild(ta);
+                    }
+                    this.copied = true;
+                    setTimeout(() => { this.copied = false; }, 1500);
+                },
+            }));
+        });
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -206,14 +233,30 @@
     <div x-show="tab === 'linux'" x-cloak class="space-y-4">
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Build the Rust core + smoke-test binary</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cd core
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cd core
 cargo build --release --example flv_to_annex_b</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Get a fresh URL from your backend and stream it</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>curl -skN 'https://&lt;camera-host&gt;:&lt;port&gt;/live.flv?devid=...&amp;hash=anything' \
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">curl -skN 'https://&lt;camera-host&gt;:&lt;port&gt;/live.flv?devid=...&amp;hash=anything' \
   | target/release/examples/flv_to_annex_b \
   | mpv --demuxer=lavf --demuxer-lavf-format=hevc --profile=low-latency -</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3">Expected stderr output</div>
@@ -227,9 +270,17 @@ done: 1 video cfg, 47 frames, 1 audio cfg, 35 audio frames</code></pre>
     <div x-show="tab === 'ios'" x-cloak class="space-y-4">
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>On a Mac with Xcode installed</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cd core
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cd core
 ./build.sh ios
 # → target/StreamaxCore.xcframework</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Create a new SwiftUI iOS project. Drag in:</div>
@@ -248,16 +299,32 @@ done: 1 video cfg, 47 frames, 1 audio cfg, 35 audio frames</code></pre>
     <div x-show="tab === 'android'" x-cloak class="space-y-4">
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Install cargo-ndk and point at your NDK</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cargo install cargo-ndk
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cargo install cargo-ndk
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125
 
 cd core
 ./build.sh android
 # → target/android-jniLibs/{arm64-v8a,armeabi-v7a,x86_64,x86}/libstreamax_core.so</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Copy the .so files into the Android project</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cp -r core/target/android-jniLibs/* android/app/src/main/jniLibs/</code></pre>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cp -r core/target/android-jniLibs/* android/app/src/main/jniLibs/</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">3</span>Open <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">android/</code> in Android Studio. The CMake build for the JNI bridge runs automatically.</div>
@@ -268,13 +335,29 @@ cd core
     <div x-show="tab === 'windows'" x-cloak class="space-y-4">
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Cross-compile from any host or build natively on Windows</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cd core
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cd core
 ./build.sh windows
 # → target/x86_64-pc-windows-gnu/release/streamax_core.dll</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Copy the DLL next to the .csproj and add it to the project</div>
-            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cp core/target/x86_64-pc-windows-gnu/release/streamax_core.dll windows/</code></pre>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cp core/target/x86_64-pc-windows-gnu/release/streamax_core.dll windows/</code></pre>
+            </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">3</span>Open <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">StreamaxDemo.csproj</code> in Visual Studio / Rider. NuGet pulls LibVLCSharp automatically.</div>
