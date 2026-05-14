@@ -82,15 +82,15 @@
             One Rust core, hardware decoders everywhere, <span class="text-slate-200 font-medium">no WebAssembly</span>.
         </p>
         <div class="flex flex-wrap gap-3">
-            <a href="#quickstart" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-accent-500 hover:bg-accent-400 text-ink-950 font-semibold transition">
-                Quick start
+            <a href="#usage" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-accent-500 hover:bg-accent-400 text-ink-950 font-semibold transition">
+                Library API
                 <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/></svg>
             </a>
-            <a href="#architecture" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-ink-800 hover:bg-ink-700 border border-ink-700 text-slate-200 font-medium transition">
-                How it works
+            <a href="#quickstart" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-ink-800 hover:bg-ink-700 border border-ink-700 text-slate-200 font-medium transition">
+                Build steps
             </a>
-            <a href="#findings" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-ink-800/40 hover:bg-ink-800 border border-ink-700 text-slate-400 hover:text-slate-200 font-medium transition">
-                What we found
+            <a href="#architecture" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-ink-800/40 hover:bg-ink-800 border border-ink-700 text-slate-400 hover:text-slate-200 font-medium transition">
+                How it works
             </a>
         </div>
     </div>
@@ -210,8 +210,173 @@
     </div>
 </section>
 
+<!-- USAGE / API -->
+<section id="usage" class="max-w-6xl mx-auto px-6 py-20" x-data="{ tab: 'ios' }">
+    <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">Using the library</div>
+    <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-3">No host, no devid, no secrets in the binary</h2>
+    <p class="text-slate-400 mb-10 max-w-3xl">Caller passes every variable part at runtime. The library exposes two entry points:
+        <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-sm">stream(...)</code> takes the URL's components,
+        <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-sm">play(url:)</code> takes a pre-built URL.
+        Both route through the same demuxer. Pinning is opt-in.</p>
+
+    <div class="flex flex-wrap gap-2 mb-6 border-b border-ink-700/60 pb-2">
+        <template x-for="t in [
+            { id: 'ios', label: 'Swift' },
+            { id: 'android', label: 'Kotlin' },
+            { id: 'windows', label: 'C#' },
+        ]" x-data>
+            <button @click="tab = t.id"
+                :class="tab === t.id ? 'bg-accent-500 text-ink-950' : 'bg-ink-800 text-slate-300 hover:bg-ink-700'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition" x-text="t.label"></button>
+        </template>
+    </div>
+
+    <!-- Swift -->
+    <div x-show="tab === 'ios'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-accent-500/10 text-accent-400 border border-accent-500/30 mr-2">stream</span>Component API — when your backend returns fields as JSON</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">let player = StreamaxPlayer()
+
+// Optional — defense-in-depth pinning. Empty by default = system CA only.
+player.pinnedSPKIHashes = ["base64-sha256-of-your-server-spki="]
+
+let creds = try await api.fetchCameraCredentials(imei: vehicle.imei)
+
+player.stream(
+    host: creds.host,
+    port: 22060,
+    uuid: creds.uuid,
+    channel: selectedCamera,
+    audio: true,
+    quality: connectionIsCellular ? .sub : .main,
+    expires: creds.expires,
+    hash: creds.hash
+)</code></pre>
+            </div>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/20 text-slate-400 border border-slate-600/40 mr-2">play</span>URL escape hatch — when the backend hands you a signed URL</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">let response = try await api.getStreamURL(imei: vehicle.imei)
+// response.url = "https://host:port/live.flv?devid=X&expires=Y&hash=Z"
+
+player.play(url: URL(string: response.url)!)</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kotlin -->
+    <div x-show="tab === 'android'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-accent-500/10 text-accent-400 border border-accent-500/30 mr-2">stream</span>Component API</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">val player = StreamaxPlayer()
+
+// Optional pinning
+player.certificatePinner = CertificatePinner.Builder()
+    .add(creds.host, "sha256/${'$'}{creds.spkiHashBase64}")
+    .build()
+
+val creds = api.fetchCameraCredentials(vehicle.imei)
+
+player.stream(
+    host = creds.host,
+    port = 22060,
+    uuid = creds.uuid,
+    channel = selectedCamera,
+    audio = true,
+    quality = StreamaxPlayer.Quality.MAIN,
+    expires = creds.expires,
+    hash = creds.hash,
+)</code></pre>
+            </div>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/20 text-slate-400 border border-slate-600/40 mr-2">play</span>URL escape hatch</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">val response = api.getStreamURL(vehicle.imei)
+player.play(response.url)</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- C# -->
+    <div x-show="tab === 'windows'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-accent-500/10 text-accent-400 border border-accent-500/30 mr-2">stream</span>Component API</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">var player = new StreamaxPlayer(libVlc)
+{
+    // Optional pinning
+    PinnedSpkiHashesBase64 = new[] { "base64-sha256-of-your-server-spki=" },
+};
+
+var creds = await api.FetchCameraCredentialsAsync(vehicle.Imei);
+
+await player.StreamAsync(
+    host:    creds.Host,
+    uuid:    creds.Uuid,
+    port:    22060,
+    channel: selectedCamera,
+    audio:   true,
+    quality: StreamaxPlayer.Quality.Main,
+    expires: creds.Expires,
+    hash:    creds.Hash);</code></pre>
+            </div>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-600/20 text-slate-400 border border-slate-600/40 mr-2">play</span>URL escape hatch</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">var response = await api.GetStreamUrlAsync(vehicle.Imei);
+await player.PlayAsync(response.Url);</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 p-4 rounded-lg bg-ink-850/50 border border-ink-700/40 text-sm text-slate-400">
+        <strong class="text-slate-300">Optional fields.</strong> Pass <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">expires: 0</code> and <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">hash: ""</code> to omit them from the constructed URL — useful while a camera server transitions to validating signed URLs.
+    </div>
+</section>
+
 <!-- QUICKSTART -->
-<section id="quickstart" class="max-w-6xl mx-auto px-6 py-20" x-data="{ tab: 'linux' }">
+<section id="quickstart" class="max-w-6xl mx-auto px-6 py-20 border-t border-ink-700/60" x-data="{ tab: 'linux' }">
     <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">Quick start</div>
     <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-3">Pick your platform</h2>
     <p class="text-slate-400 mb-10 max-w-2xl">Each build produces one artifact. Drop it into the matching platform project and you're done.</p>
