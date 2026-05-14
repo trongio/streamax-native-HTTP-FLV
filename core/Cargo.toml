@@ -1,0 +1,15 @@
+[package]
+name = "streamax-core"
+version = "0.1.0"
+edition = "2021"
+description = "FLV (HEVC+AAC variant) demuxer for Streamax / Hikvision live streams."
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

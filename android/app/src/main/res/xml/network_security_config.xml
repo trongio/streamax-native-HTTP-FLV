@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The camera server uses a cert that isn't in Android's trust store, plus the
+  unusual port 22060. The TrustManager in StreamaxPlayer accepts that cert,
+  but Android 9+ blocks cleartext + untrusted CAs at the platform level before
+  our code runs. This config allows the demo host explicitly.
+
+  Production: replace the trustAnchor with the real pinned cert and remove
+  cleartextTrafficPermitted.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">YOUR-CAMERA-HOST.example.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

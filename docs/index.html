@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>streamax-native — native players for Streamax HTTP-FLV cameras</title>
+    <meta name="description" content="iOS, Android, Windows and Linux players for Streamax dashcam HTTP-FLV streams. Shared Rust core, hardware decoded, no WebAssembly." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+                    },
+                    colors: {
+                        ink: { 950: '#08090d', 900: '#0c0e14', 850: '#11141c', 800: '#161a23', 700: '#1f242f', 600: '#2a3140' },
+                        accent: { 400: '#7dd3fc', 500: '#38bdf8', 600: '#0284c7' },
+                        signal: { green: '#34d399', amber: '#fbbf24', red: '#f87171' },
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        body { font-feature-settings: 'cv11', 'ss03', 'ss01'; }
+        .gradient-text { background: linear-gradient(135deg, #7dd3fc 0%, #c4b5fd 50%, #f9a8d4 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .gradient-border { position: relative; }
+        .gradient-border::before { content: ''; position: absolute; inset: 0; padding: 1px; border-radius: inherit; background: linear-gradient(135deg, rgba(125,211,252,.4), rgba(196,181,253,.2), rgba(249,168,212,.1)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+        pre code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; line-height: 1.7; }
+        .grid-bg { background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px); background-size: 40px 40px; }
+    </style>
+</head>
+<body class="bg-ink-950 text-slate-200 font-sans antialiased">
+
+<!-- HERO -->
+<section class="relative overflow-hidden border-b border-ink-700/60">
+    <div class="absolute inset-0 grid-bg opacity-60"></div>
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-accent-500/10 blur-3xl rounded-full"></div>
+    <div class="relative max-w-6xl mx-auto px-6 py-20 lg:py-28">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink-800/80 border border-ink-700 text-xs text-slate-400 mb-6">
+            <span class="w-1.5 h-1.5 rounded-full bg-signal-green animate-pulse"></span>
+            v0.1.0 — verified against live camera
+        </div>
+        <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6">
+            <span class="gradient-text">streamax-native</span>
+        </h1>
+        <p class="text-xl lg:text-2xl text-slate-400 max-w-3xl mb-8 leading-relaxed">
+            Native iOS, Android, Windows and Linux players for Streamax dashcam HTTP-FLV streams.
+            One Rust core, hardware decoders everywhere, <span class="text-slate-200 font-medium">no WebAssembly</span>.
+        </p>
+        <div class="flex flex-wrap gap-3">
+            <a href="#quickstart" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-accent-500 hover:bg-accent-400 text-ink-950 font-semibold transition">
+                Quick start
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/></svg>
+            </a>
+            <a href="#architecture" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-ink-800 hover:bg-ink-700 border border-ink-700 text-slate-200 font-medium transition">
+                How it works
+            </a>
+            <a href="#findings" class="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-ink-800/40 hover:bg-ink-800 border border-ink-700 text-slate-400 hover:text-slate-200 font-medium transition">
+                What we found
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- STATS -->
+<section class="max-w-6xl mx-auto px-6 -mt-12 relative z-10">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <template x-for="s in [
+            { label: 'Rust core', value: '~600', unit: 'lines' },
+            { label: 'Platforms', value: '4', unit: 'native targets' },
+            { label: 'WASM removed', value: '3.7', unit: 'MB per page' },
+            { label: 'Vendor SDKs', value: '0', unit: 'required' },
+        ]" x-data>
+            <div class="gradient-border rounded-xl bg-ink-850/80 backdrop-blur p-5 border border-ink-700/60">
+                <div class="text-xs uppercase tracking-wider text-slate-500" x-text="s.label"></div>
+                <div class="mt-2 flex items-baseline gap-1.5">
+                    <span class="text-3xl font-bold text-slate-100" x-text="s.value"></span>
+                    <span class="text-sm text-slate-500" x-text="s.unit"></span>
+                </div>
+            </div>
+        </template>
+    </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="max-w-6xl mx-auto px-6 py-20">
+    <div class="grid lg:grid-cols-2 gap-12 items-start">
+        <div>
+            <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">The problem</div>
+            <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-6 leading-tight">
+                Browsers can't play these streams.<br/>Native platforms can.
+            </h2>
+            <div class="space-y-4 text-slate-400 leading-relaxed">
+                <p>The Streamax web client ships a <span class="text-slate-200 font-medium">3.7 MB minified WebAssembly bundle</span> that decodes HEVC in software because <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-sm">&lt;video&gt;</code> tags can't handle the format.</p>
+                <p>iOS, Android and Windows all have hardware HEVC decoders. The <em>only</em> blocker is that the FLV variant these cameras emit uses <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-sm">codec_id&nbsp;=&nbsp;12</code> directly — a non-standard Chinese-vendor convention that mainline FFmpeg and libVLC reject or crash on.</p>
+                <p>Solve that single demux problem and the rest is free.</p>
+            </div>
+        </div>
+
+        <div class="bg-ink-850 rounded-xl border border-ink-700/60 overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-ink-700/60 bg-ink-900/50">
+                <span class="w-3 h-3 rounded-full bg-signal-red"></span>
+                <span class="w-3 h-3 rounded-full bg-signal-amber"></span>
+                <span class="w-3 h-3 rounded-full bg-signal-green"></span>
+                <span class="ml-2 text-xs text-slate-500 font-mono">terminal — without this library</span>
+            </div>
+            <pre class="px-5 py-4 text-sm overflow-x-auto"><code><span class="text-slate-500">$ mpv 'https://camera.../live.flv?...'</span>
+<span class="text-signal-red">[ffmpeg/demuxer] flv: Video codec (c) is not</span>
+<span class="text-signal-red">implemented. Update your FFmpeg version...</span>
+
+<span class="text-slate-500">$ vlc 'https://camera.../live.flv?...'</span>
+<span class="text-signal-red">zsh: segmentation fault (core dumped)  vlc</span>
+
+<span class="text-slate-500">$ ffprobe 'https://camera.../live.flv?...'</span>
+<span class="text-signal-red">zsh: segmentation fault (core dumped)  ffprobe</span></code></pre>
+        </div>
+    </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture" class="border-y border-ink-700/60 bg-ink-900/40">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+        <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">Architecture</div>
+        <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-12">One core, four targets</h2>
+
+        <div class="grid lg:grid-cols-3 gap-6">
+            <!-- Core -->
+            <div class="lg:col-span-3 gradient-border rounded-xl bg-gradient-to-br from-ink-850 to-ink-900 border border-ink-700/60 p-8">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-lg bg-accent-500/10 border border-accent-500/30 flex items-center justify-center">
+                        <span class="text-2xl">🦀</span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-slate-100">streamax-core</h3>
+                        <p class="text-slate-400 text-sm mt-1">Rust crate, ~600 LOC. Compiles to a static lib (iOS), shared lib (Android, Linux), or DLL (Windows).</p>
+                    </div>
+                </div>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                    <template x-for="m in [
+                        ['flv.rs', 'streaming FLV state machine'],
+                        ['hevc.rs', 'HEVC SPS dimension parser'],
+                        ['aac.rs', 'AAC AudioSpecificConfig'],
+                        ['ffi.rs', 'C ABI (pull-style)'],
+                    ]" x-data>
+                        <div class="rounded-lg bg-ink-850/80 border border-ink-700/60 px-4 py-3">
+                            <div class="font-mono text-sm text-accent-400" x-text="m[0]"></div>
+                            <div class="text-xs text-slate-500 mt-1" x-text="m[1]"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Platforms -->
+            <template x-for="p in [
+                { name: 'iOS', icon: '', detail: 'VideoToolbox + AVSampleBufferDisplayLayer + AVSampleBufferAudioRenderer', features: ['HEVC HW decode', 'AAC audio', 'Reconnect', 'SPKI pinning'] },
+                { name: 'Android', icon: '🤖', detail: 'MediaCodec + Surface + AudioTrack', features: ['HEVC HW decode', 'AAC audio', 'Reconnect', 'OkHttp pinning'] },
+                { name: 'Windows', icon: '🪟', detail: 'libVLC via LibVLCSharp.WPF', features: ['HEVC HW decode', 'Audio: TODO (MPEG-TS muxer)', 'Reconnect', 'SPKI pinning'] },
+            ]" x-data>
+                <div class="rounded-xl bg-ink-850 border border-ink-700/60 p-6 hover:border-ink-600 transition">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-2xl" x-text="p.icon"></span>
+                        <h3 class="text-lg font-bold text-slate-100" x-text="p.name"></h3>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-4 font-mono leading-relaxed" x-text="p.detail"></p>
+                    <ul class="space-y-1.5">
+                        <template x-for="f in p.features">
+                            <li class="flex items-center gap-2 text-sm text-slate-300">
+                                <svg class="w-4 h-4 text-signal-green flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <span x-text="f"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+        </div>
+    </div>
+</section>
+
+<!-- QUICKSTART -->
+<section id="quickstart" class="max-w-6xl mx-auto px-6 py-20" x-data="{ tab: 'linux' }">
+    <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">Quick start</div>
+    <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-3">Pick your platform</h2>
+    <p class="text-slate-400 mb-10 max-w-2xl">Each build produces one artifact. Drop it into the matching platform project and you're done.</p>
+
+    <div class="flex flex-wrap gap-2 mb-6 border-b border-ink-700/60 pb-2">
+        <template x-for="t in [
+            { id: 'linux', label: 'Linux smoke test' },
+            { id: 'ios', label: 'iOS' },
+            { id: 'android', label: 'Android' },
+            { id: 'windows', label: 'Windows' },
+        ]" x-data>
+            <button @click="tab = t.id"
+                :class="tab === t.id ? 'bg-accent-500 text-ink-950' : 'bg-ink-800 text-slate-300 hover:bg-ink-700'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition" x-text="t.label"></button>
+        </template>
+    </div>
+
+    <!-- LINUX -->
+    <div x-show="tab === 'linux'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Build the Rust core + smoke-test binary</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cd core
+cargo build --release --example flv_to_annex_b</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Get a fresh URL from your backend and stream it</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>curl -skN 'https://&lt;camera-host&gt;:&lt;port&gt;/live.flv?devid=...&amp;hash=anything' \
+  | target/release/examples/flv_to_annex_b \
+  | mpv --demuxer=lavf --demuxer-lavf-format=hevc --profile=low-latency -</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3">Expected stderr output</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-400"><code>VideoConfig: 352x288, 74 bytes
+AudioConfig: 8000Hz 1ch
+done: 1 video cfg, 47 frames, 1 audio cfg, 35 audio frames</code></pre>
+        </div>
+    </div>
+
+    <!-- iOS -->
+    <div x-show="tab === 'ios'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>On a Mac with Xcode installed</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cd core
+./build.sh ios
+# → target/StreamaxCore.xcframework</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Create a new SwiftUI iOS project. Drag in:</div>
+            <ul class="text-sm text-slate-400 space-y-1 ml-6 font-mono">
+                <li>• <span class="text-accent-400">StreamaxCore.xcframework</span> &nbsp;(Embed &amp; Sign)</li>
+                <li>• <span class="text-accent-400">ios/*.swift</span> &nbsp;(4 files)</li>
+                <li>• <span class="text-accent-400">ios/StreamaxCore-Bridging-Header.h</span> &nbsp;(set as Bridging Header)</li>
+            </ul>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">3</span>Merge <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">Info.plist.snippet.xml</code> into your <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">Info.plist</code>. Build &amp; run.</div>
+        </div>
+    </div>
+
+    <!-- ANDROID -->
+    <div x-show="tab === 'android'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Install cargo-ndk and point at your NDK</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cargo install cargo-ndk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125
+
+cd core
+./build.sh android
+# → target/android-jniLibs/{arm64-v8a,armeabi-v7a,x86_64,x86}/libstreamax_core.so</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Copy the .so files into the Android project</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cp -r core/target/android-jniLibs/* android/app/src/main/jniLibs/</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">3</span>Open <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">android/</code> in Android Studio. The CMake build for the JNI bridge runs automatically.</div>
+        </div>
+    </div>
+
+    <!-- WINDOWS -->
+    <div x-show="tab === 'windows'" x-cloak class="space-y-4">
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Cross-compile from any host or build natively on Windows</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cd core
+./build.sh windows
+# → target/x86_64-pc-windows-gnu/release/streamax_core.dll</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Copy the DLL next to the .csproj and add it to the project</div>
+            <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-300"><code>cp core/target/x86_64-pc-windows-gnu/release/streamax_core.dll windows/</code></pre>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">3</span>Open <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">StreamaxDemo.csproj</code> in Visual Studio / Rider. NuGet pulls LibVLCSharp automatically.</div>
+        </div>
+    </div>
+</section>
+
+<!-- PRODUCTION STATUS TABLE -->
+<section class="border-y border-ink-700/60 bg-ink-900/40">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+        <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">Production status</div>
+        <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-10">What's ready, what isn't</h2>
+        <div class="overflow-x-auto rounded-xl border border-ink-700/60 bg-ink-850">
+            <table class="w-full text-sm">
+                <thead class="bg-ink-900/50">
+                    <tr>
+                        <th class="text-left px-5 py-3 font-semibold text-slate-300">Feature</th>
+                        <th class="text-center px-5 py-3 font-semibold text-slate-300">iOS</th>
+                        <th class="text-center px-5 py-3 font-semibold text-slate-300">Android</th>
+                        <th class="text-center px-5 py-3 font-semibold text-slate-300">Windows</th>
+                    </tr>
+                </thead>
+                <tbody x-data="{
+                    rows: [
+                        { name: 'HEVC hardware decode',    a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'Shared Rust core',        a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'AAC audio',               a: 'ok', b: 'ok', c: 'todo' },
+                        { name: 'A/V sync',                a: 'ok', b: 'warn', c: 'na' },
+                        { name: 'Reconnect (exp backoff)', a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'SPS-parsed dimensions',   a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'SPKI cert pinning hook',  a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'PiP support',             a: 'todo', b: 'todo', c: 'na' },
+                    ]
+                }">
+                    <template x-for="(row, i) in rows" :key="row.name">
+                        <tr :class="i % 2 ? '' : 'bg-ink-900/30'" class="border-t border-ink-700/40">
+                            <td class="px-5 py-3 text-slate-300" x-text="row.name"></td>
+                            <template x-for="v in [row.a, row.b, row.c]">
+                                <td class="text-center px-5 py-3">
+                                    <span x-show="v === 'ok'" class="text-signal-green">✓</span>
+                                    <span x-show="v === 'warn'" class="text-signal-amber" title="Independent clocks (acceptable drift on live)">⚠</span>
+                                    <span x-show="v === 'todo'" class="text-slate-500">—</span>
+                                    <span x-show="v === 'na'" class="text-slate-700">·</span>
+                                </td>
+                            </template>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-sm text-slate-500 mt-4">Windows audio path requires an MPEG-TS muxer in the Rust core — the demuxer already extracts AAC frames, it's just not wired through to libVLC yet. ~2 days of work to add.</p>
+    </div>
+</section>
+
+<!-- FINDINGS -->
+<section id="findings" class="max-w-6xl mx-auto px-6 py-20">
+    <div class="text-accent-500 text-sm font-semibold tracking-wider uppercase mb-3">Discovered along the way</div>
+    <h2 class="text-3xl lg:text-4xl font-bold text-slate-100 mb-3">Two things worth knowing</h2>
+    <p class="text-slate-400 mb-10 max-w-2xl">Both are out-of-scope for this repo but show up while building it. File them on the relevant backlog.</p>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+        <div class="rounded-xl bg-ink-850 border border-ink-700/60 p-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-signal-red/10 text-signal-red border border-signal-red/30">Security</span>
+                <h3 class="text-lg font-bold text-slate-100">The URL hash is fake</h3>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed mb-4">In <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">streamax_stream.php</code>:</p>
+            <pre class="bg-ink-950 rounded p-3 text-xs overflow-x-auto"><code><span class="text-slate-500">// line 34</span>
+<span class="text-pink-300">$hash</span> = <span class="text-accent-400">generateRandomString</span>(<span class="text-accent-400">rand</span>(<span class="text-amber-300">20</span>, <span class="text-amber-300">200</span>));</code></pre>
+            <p class="text-sm text-slate-400 leading-relaxed mt-4">The camera server doesn't validate this. Anyone with a <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">devid</code> can stream forever. Replace with HMAC + TTL on the server side.</p>
+        </div>
+
+        <div class="rounded-xl bg-ink-850 border border-ink-700/60 p-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-signal-amber/10 text-signal-amber border border-signal-amber/30">Upstream</span>
+                <h3 class="text-lg font-bold text-slate-100">Mainline FFmpeg 7.x still crashes</h3>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed mb-4">Tested with the johnvansickle.com static FFmpeg 7.0.2 build:</p>
+            <pre class="bg-ink-950 rounded p-3 text-xs overflow-x-auto"><code><span class="text-slate-500">$ ffprobe 'https://camera.../live.flv?...'</span>
+<span class="text-signal-red">zsh: segmentation fault (core dumped)</span>
+<span class="text-signal-red">ffprobe -v info 'https://...'</span></code></pre>
+            <p class="text-sm text-slate-400 leading-relaxed mt-4">The "enhanced RTMP" patches added codec ID 12 via FOURCC method; the Chinese-vendor direct-codec-12 encoding still segfaults. That's why we need our own demuxer.</p>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="border-t border-ink-700/60 bg-ink-900/40 mt-12">
+    <div class="max-w-6xl mx-auto px-6 py-10">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3 text-slate-500 text-sm">
+                <span class="font-mono">streamax-native v0.1.0</span>
+                <span>·</span>
+                <span>MIT License</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <a href="../README.md" class="text-slate-400 hover:text-slate-200 transition">README</a>
+                <a href="https://github.com/" class="text-slate-400 hover:text-slate-200 transition">GitHub</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

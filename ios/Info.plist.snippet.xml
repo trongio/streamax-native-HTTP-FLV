@@ -1,0 +1,26 @@
+<!--
+  Drop this into your app's Info.plist under <dict>.
+  The camera server uses a cert iOS doesn't trust by default, plus port 22060.
+  ATS would otherwise block the connection before StreamaxPlayer's
+  URLSessionDelegate ever gets a chance to accept the cert.
+
+  In production: replace the exception with proper cert pinning or move the
+  camera behind a trusted edge (your own TLS terminator).
+-->
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSExceptionDomains</key>
+    <dict>
+        <key>YOUR-CAMERA-HOST.example.com</key>
+        <dict>
+            <key>NSExceptionAllowsInsecureHTTPLoads</key>
+            <true/>
+            <key>NSIncludesSubdomains</key>
+            <false/>
+            <key>NSExceptionMinimumTLSVersion</key>
+            <string>TLSv1.0</string>
+            <key>NSExceptionRequiresForwardSecrecy</key>
+            <false/>
+        </dict>
+    </dict>
+</dict>

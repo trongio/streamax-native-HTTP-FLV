@@ -1,0 +1,113 @@
+# streamax-native
+
+Native iOS / Android / Windows / Linux players for Streamax (and similar Chinese
+MDVR) HTTP-FLV live streams. **Bypasses** the proprietary 3.7 MB WebAssembly
+player vendors ship for the web.
+
+A shared Rust core does the FLV demuxing once; thin platform wrappers feed
+hardware decoders (VideoToolbox / MediaCodec / DXVA via libVLC).
+
+## Why this exists
+
+The web client these cameras ship with is a `streamaxPlayer` WebAssembly
+bundle that decodes HEVC in software because browsers can't play it natively.
+On mobile and desktop the same constraint doesn't apply — every modern
+platform has a hardware HEVC decoder. The blocker for "just use ffmpeg / VLC"
+is that the FLV variant the cameras emit uses **codec_id 12 (HEVC) directly**
+in the video tag header — a non-standard Chinese-vendor convention that
+mainline FFmpeg and libVLC either reject or crash on.
+
+This project ships a tiny demuxer that handles exactly that variant, and three
+native players built on top of it.
+
+## Architecture
+
+```
+                ┌──────────────────────────────────┐
+                │  streamax-core  (Rust, ~600 LOC) │
+                │                                  │
+                │  FLV state machine               │
+                │  HEVC SPS dimension parser       │
+                │  AAC AudioSpecificConfig parser  │
+                │  C ABI (pull-style events)       │
+                └──────────────┬───────────────────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+  iOS (Swift)           Android (Kotlin)         Windows (.NET)
+  VideoToolbox          MediaCodec               libVLC
+  AVAudioRenderer       AudioTrack               (audio: TODO)
+```
+
+## What's in here
+
+| Directory  | Contents                                                          |
+| ---------- | ----------------------------------------------------------------- |
+| `core/`    | Rust crate — demuxer + parsers + C ABI + build script             |
+| `ios/`     | Swift player (HEVC + AAC, reconnect, SPKI pinning, SwiftUI demo)  |
+| `android/` | Kotlin player (HEVC + AAC, reconnect, OkHttp pinning, Compose UI) |
+| `windows/` | C# WPF player (HEVC via libVLC, reconnect, SPKI pinning)          |
+| `tools/`   | Python demuxer + Tk demo for Linux smoke-testing                  |
+| `docs/`    | HTML build / usage walkthrough (open `docs/index.html` locally)   |
+
+## Quick start (Linux smoke test)
+
+The fastest way to confirm the recipe works against your camera:
+
+```bash
+# 1. Build the Rust core
+cd core && cargo build --release --example flv_to_annex_b
+
+# 2. Get a fresh URL from the PHP backend (DevTools → /request/dashcam_getstream)
+URL='https://<camera-host>:<port>/live.flv?devid=...&chl=1&st=1&audio=1&hash=anything'
+
+# 3. Stream it
+curl -skN "$URL" \
+  | target/release/examples/flv_to_annex_b \
+  | mpv --demuxer=lavf --demuxer-lavf-format=hevc --profile=low-latency -
+```
+
+Stderr from `flv_to_annex_b` reports detected resolution, codec, frame count.
+
+## Building per platform
+
+See [docs/index.html](docs/index.html) for the visual walkthrough. TL;DR:
+
+| Platform | Command                              | Output                          |
+| -------- | ------------------------------------ | ------------------------------- |
+| Linux    | `core/build.sh linux`                | `libstreamax_core.{a,so}`       |
+| iOS      | `core/build.sh ios` (macOS + Xcode)  | `StreamaxCore.xcframework`      |
+| Android  | `core/build.sh android` (NDK)        | `libstreamax_core.so` per ABI   |
+| Windows  | `core/build.sh windows`              | `streamax_core.dll`             |
+
+Then drop the artifact into the matching platform project and open in Xcode /
+Android Studio / Visual Studio.
+
+## Production status
+
+| Feature                  | iOS | Android | Windows                  |
+| ------------------------ | --- | ------- | ------------------------ |
+| HEVC hardware decode     | ✅  | ✅      | ✅                       |
+| AAC audio                | ✅  | ✅      | ⚠️ Needs MPEG-TS muxer   |
+| Reconnect (exp backoff)  | ✅  | ✅      | ✅                       |
+| SPS-parsed dimensions    | ✅  | ✅      | ✅                       |
+| Cert pinning hook        | ✅  | ✅      | ✅                       |
+| A/V sync                 | ✅  | ⚠️      | n/a                      |
+
+See `docs/index.html` → "Production status" for the full checklist.
+
+## Findings worth knowing about
+
+While building this we discovered two things on the server side worth fixing:
+
+1. **The `hash` URL parameter is fake.** `streamax_stream.php:34` generates a
+   random string of random length and the camera server doesn't validate it.
+   Anyone with a `devid` can stream forever. Replace with a real HMAC + TTL.
+
+2. **Mainline FFmpeg ≥ 7.0 still doesn't demux the HEVC-in-FLV variant.** Ours
+   sometimes crashes (`ffprobe` segfault). The streams *can* be played — just
+   not through stock FLV demuxers. Hence this project.
+
+## License
+
+MIT. See `LICENSE`.

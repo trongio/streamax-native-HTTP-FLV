@@ -1,0 +1,44 @@
+# Rust
+/core/target/
+**/*.rs.bk
+**/Cargo.lock.bak
+
+# Generated platform artifacts
+/core/target/StreamaxCore.xcframework
+/core/target/android-jniLibs/
+/android/app/src/main/jniLibs/
+
+# iOS / Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.xcworkspace/xcuserdata/
+
+# Android / Gradle
+.gradle/
+/local.properties
+/.idea/
+.cxx/
+build/
+captures/
+*.iml
+
+# Windows / .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Editor noise
+.vscode/
+*.swp
+
+# Test artifacts
+/tmp/
+*.hevc
+*.mkv
