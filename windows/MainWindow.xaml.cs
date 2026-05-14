@@ -20,12 +20,9 @@ public partial class MainWindow : Window
             "--no-osd",
             "--quiet"
         );
-        _player = new StreamaxPlayer(_libVlc)
-        {
-            // SHA-256 of the SubjectPublicKeyInfo for YOUR-CAMERA-HOST.example.com:22060
-            // (Sectigo-issued cert, expires 2026-12-28). Re-pin if the cert key rotates.
-            PinnedSpkiHashesBase64 = new[] { "YOUR-SPKI-HASH-BASE64=" },
-        };
+        _player = new StreamaxPlayer(_libVlc);
+        // To enable SPKI pinning at runtime (recommended for production):
+        //   _player.PinnedSpkiHashesBase64 = new[] { "<base64-sha256-of-your-server-spki>" };
 
         Loaded += (_, _) => VideoView.MediaPlayer = _player.MediaPlayer;
 

@@ -57,19 +57,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun PlayerScreen(activity: MainActivity? = null) {
     val player = remember { StreamaxPlayer() }
-    var url by remember {
-        mutableStateOf("https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=YOUR-DEVID&chl=1&st=1&audio=0&hash=anything")
-    }
+    var url by remember { mutableStateOf("") }
     var state by remember { mutableStateOf(StreamaxPlayer.State.IDLE) }
     var error by remember { mutableStateOf<String?>(null) }
     val inPip = activity?.inPip?.value ?: false
 
     DisposableEffect(Unit) {
-        // SHA-256 of the SubjectPublicKeyInfo for YOUR-CAMERA-HOST.example.com:22060
-        // (Sectigo-issued cert, expires 2026-12-28). Re-pin if the cert key rotates.
-        player.certificatePinner = okhttp3.CertificatePinner.Builder()
-            .add("YOUR-CAMERA-HOST.example.com", "sha256/YOUR-SPKI-HASH-BASE64=")
-            .build()
+        // To enable SPKI pinning at runtime (recommended for production):
+        //   player.certificatePinner = okhttp3.CertificatePinner.Builder()
+        //       .add(yourHost, "sha256/$yourSpkiHashBase64")
+        //       .build()
         player.stateListener = object : StreamaxPlayer.StateListener {
             override fun onState(s: StreamaxPlayer.State) { state = s }
             override fun onError(message: String) { error = message }

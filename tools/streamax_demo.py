@@ -37,9 +37,7 @@ class App:
         frm.pack(fill="both", expand=True)
 
         ttk.Label(frm, text="Live FLV URL").grid(row=0, column=0, sticky="w")
-        self.url_var = tk.StringVar(
-            value="https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=&chl=1&st=1&audio=1&hash=x"
-        )
+        self.url_var = tk.StringVar(value="")
         self.entry = ttk.Entry(frm, textvariable=self.url_var)
         self.entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(2, 10))
 

@@ -77,16 +77,12 @@ private struct CameraTile: View {
 @available(iOS 14.0, *)
 private final class CameraTileModel: ObservableObject {
     let player = StreamaxPlayer()
-    init() {
-        player.pinnedSPKIHashes = ["YOUR-SPKI-HASH-BASE64="]
-    }
+    // To enable SPKI pinning, set player.pinnedSPKIHashes after construction.
 }
 
 #Preview {
     if #available(iOS 14.0, *) {
-        MultiCameraView(cameras: [
-            .init(label: "Camera 1", url: URL(string: "https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=YOUR-DEVID&chl=1&st=1&audio=0&hash=x")!),
-            .init(label: "Camera 2", url: URL(string: "https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=YOUR-DEVID&chl=1&st=1&audio=0&hash=x")!),
-        ])
+        // Preview cameras: callers pass their own list of URLs at runtime.
+        MultiCameraView(cameras: [])
     }
 }

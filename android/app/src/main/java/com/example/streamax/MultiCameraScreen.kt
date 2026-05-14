@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import okhttp3.CertificatePinner
 
 /**
  * Multi-camera grid. Each cell owns its own StreamaxPlayer + SurfaceView;
@@ -44,9 +43,9 @@ private fun CameraTile(camera: Camera) {
     var state by remember { mutableStateOf(StreamaxPlayer.State.IDLE) }
 
     DisposableEffect(camera.id) {
-        player.certificatePinner = CertificatePinner.Builder()
-            .add("YOUR-CAMERA-HOST.example.com", "sha256/YOUR-SPKI-HASH-BASE64=")
-            .build()
+        // Optionally configure pinning at runtime (kept out of the binary):
+        //   player.certificatePinner = CertificatePinner.Builder()
+        //       .add(host, "sha256/$spki").build()
         player.stateListener = object : StreamaxPlayer.StateListener {
             override fun onState(s: StreamaxPlayer.State) { state = s }
             override fun onError(message: String) {}

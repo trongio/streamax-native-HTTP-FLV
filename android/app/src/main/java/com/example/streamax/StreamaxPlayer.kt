@@ -45,10 +45,10 @@ class StreamaxPlayer {
     @Volatile var surface: Surface? = null
     var stateListener: StateListener? = null
 
-    /** Pin in production: `CertificatePinner.Builder().add("YOUR-CAMERA-HOST.example.com", "sha256/...").build()` */
+    /** Optional SPKI pinning. Caller opts in. */
     var certificatePinner: CertificatePinner? = null
-    /** Fallback when [certificatePinner] is null. */
-    var trustedInsecureHosts: Set<String> = setOf("YOUR-CAMERA-HOST.example.com")
+    /** Optional self-signed-cert trust by host. Empty by default — standard CA validation applies. */
+    var trustedInsecureHosts: Set<String> = emptySet()
 
     private val core = StreamaxCore()
     private val codecThread = HandlerThread("streamax-codec").also { it.start() }
@@ -73,6 +73,33 @@ class StreamaxPlayer {
         currentUrl = url
         startCall()
     }
+
+    /**
+     * Convenience: build a Streamax live-FLV URL from components and play it.
+     * Library never holds a host or device id. [expires] + [hash] come from
+     * the auth backend; pass 0 / "" to omit them.
+     */
+    fun stream(
+        host: String,
+        port: Int = 22060,
+        uuid: String,
+        channel: Int = 1,
+        audio: Boolean = true,
+        quality: Quality = Quality.MAIN,
+        expires: Long = 0L,
+        hash: String = "",
+    ) {
+        val params = StringBuilder()
+            .append("devid=").append(uuid)
+            .append("&chl=").append(channel)
+            .append("&st=").append(quality.value)
+            .append("&audio=").append(if (audio) 1 else 0)
+        if (expires > 0L) params.append("&expires=").append(expires)
+        if (hash.isNotEmpty()) params.append("&hash=").append(hash)
+        play("https://$host:$port/live.flv?$params")
+    }
+
+    enum class Quality(val value: Int) { SUB(0), MAIN(1) }
 
     fun stop() {
         stopped = true

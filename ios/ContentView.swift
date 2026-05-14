@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftUI
 
 struct ContentView: View {
-    @State private var urlString = "https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=YOUR-DEVID&chl=1&st=1&audio=1&hash=anything"
+    @State private var urlString = ""
     @State private var state: StreamaxPlayer.State = .idle
     @State private var errorMessage: String?
     @StateObject private var model = PlayerModel()
@@ -14,7 +14,7 @@ struct ContentView: View {
                 .aspectRatio(16.0/9.0, contentMode: .fit)
                 .cornerRadius(8)
 
-            TextField("Live FLV URL", text: $urlString, axis: .vertical)
+            TextField("Paste a live FLV URL", text: $urlString, axis: .vertical)
                 .font(.system(.footnote, design: .monospaced))
                 .lineLimit(1...4)
                 .textFieldStyle(.roundedBorder)
@@ -30,6 +30,7 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!isActive && urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Spacer()
 
@@ -74,16 +75,10 @@ struct ContentView: View {
 @available(iOS 14.0, *)
 final class PlayerModel: ObservableObject {
     let player = StreamaxPlayer()
-
-    init() {
-        // SHA-256 of the SubjectPublicKeyInfo for YOUR-CAMERA-HOST.example.com:22060
-        // (Sectigo-issued cert, expires 2026-12-28). To re-pin:
-        //   openssl s_client -connect YOUR-CAMERA-HOST.example.com:22060 </dev/null 2>/dev/null \
-        //     | openssl x509 -pubkey -noout \
-        //     | openssl pkey -pubin -outform DER \
-        //     | openssl dgst -sha256 -binary | openssl base64
-        player.pinnedSPKIHashes = ["YOUR-SPKI-HASH-BASE64="]
-    }
+    // To enable optional SPKI pinning at runtime, set after construction:
+    //   model.player.pinnedSPKIHashes = ["<base64-sha256-of-your-server-spki>"]
+    // To trust a self-signed cert on a specific host (defense-in-depth alternative):
+    //   model.player.trustedInsecureHosts = ["your.camera.host"]
 }
 
 #Preview { ContentView() }

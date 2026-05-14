@@ -26,8 +26,9 @@ final class StreamaxPlayer: NSObject {
     /// SHA-256 hashes (Base64) of trusted server SPKIs. When non-empty,
     /// the URLSession delegate rejects any cert whose SPKI hash isn't here.
     var pinnedSPKIHashes: Set<String> = []
-    /// Fallback when pinning is empty — trust this exact host's cert without CA verification.
-    var trustedInsecureHosts: Set<String> = ["YOUR-CAMERA-HOST.example.com"]
+    /// Optional: trust the named hosts' certs without CA verification (for self-signed setups).
+    /// Empty by default — standard system CA validation applies. Caller opts in.
+    var trustedInsecureHosts: Set<String> = []
 
     /// Called on the main queue.
     var onStateChange: ((State) -> Void)?
@@ -125,6 +126,40 @@ final class StreamaxPlayer: NSObject {
             self.startTask()
         }
     }
+
+    /// Convenience: build a Streamax live-FLV URL from components and play it.
+    /// Caller controls every variable part; the library never holds a host or
+    /// device id. `expires` + `hash` come from the auth backend; pass 0 / "" to
+    /// omit them (back-compat with servers that don't validate yet).
+    func stream(
+        host: String,
+        port: Int = 22060,
+        uuid: String,
+        channel: Int = 1,
+        audio: Bool = true,
+        quality: Quality = .main,
+        expires: Int = 0,
+        hash: String = ""
+    ) {
+        var c = URLComponents()
+        c.scheme = "https"
+        c.host = host
+        c.port = port
+        c.path = "/live.flv"
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "devid", value: uuid),
+            URLQueryItem(name: "chl",   value: String(channel)),
+            URLQueryItem(name: "st",    value: String(quality.rawValue)),
+            URLQueryItem(name: "audio", value: audio ? "1" : "0"),
+        ]
+        if expires > 0 { items.append(URLQueryItem(name: "expires", value: String(expires))) }
+        if !hash.isEmpty { items.append(URLQueryItem(name: "hash", value: hash)) }
+        c.queryItems = items
+        guard let url = c.url else { return }
+        play(url: url)
+    }
+
+    enum Quality: Int { case sub = 0, main = 1 }
 
     func stop() {
         queue.async { [weak self] in

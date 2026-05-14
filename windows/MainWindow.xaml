@@ -17,8 +17,9 @@
 
         <TextBox Grid.Row="1" x:Name="UrlBox" Margin="0,12,0,0"
                  FontFamily="Consolas" FontSize="12"
-                 Text="https://YOUR-CAMERA-HOST.example.com:22060/live.flv?devid=YOUR-DEVID&amp;chl=1&amp;st=1&amp;audio=0&amp;hash=anything"
-                 TextWrapping="Wrap" AcceptsReturn="False" />
+                 Text=""
+                 TextWrapping="Wrap" AcceptsReturn="False"
+                 ToolTip="Paste a live FLV URL or call _player.StreamAsync(host: ..., uuid: ...)" />
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
             <Button x:Name="PlayButton" Content="Play" Width="100" Click="OnPlayClick" />

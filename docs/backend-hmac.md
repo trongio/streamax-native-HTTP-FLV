@@ -52,7 +52,7 @@ Same secret must be configured on the camera server.
 
 ## Camera server validation (the missing half)
 
-The Streamax media server at `YOUR-CAMERA-HOST.example.com:22060` needs a small middleware
+The Streamax media server (`<your-camera-host>:<port>`) needs a small middleware
 that, before serving `/live.flv`, validates:
 
 1. `expires > current_unix_time` (URL hasn't expired)

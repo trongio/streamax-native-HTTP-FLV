@@ -32,8 +32,8 @@ public sealed class StreamaxPlayer : IDisposable
     /// any cert whose SPKI hash isn't in this set is rejected.
     /// </summary>
     public string[] PinnedSpkiHashesBase64 { get; set; } = Array.Empty<string>();
-    /// <summary>Fallback when pinning is empty.</summary>
-    public string[] TrustedInsecureHosts { get; set; } = { "YOUR-CAMERA-HOST.example.com" };
+    /// <summary>Optional: hosts whose self-signed certs we accept. Empty by default.</summary>
+    public string[] TrustedInsecureHosts { get; set; } = Array.Empty<string>();
 
     private readonly LibVLC _libVlc;
     private readonly StreamaxCore _core = new();
@@ -64,6 +64,33 @@ public sealed class StreamaxPlayer : IDisposable
         _reconnectAttempt = 0;
         return StartAsync();
     }
+
+    /// <summary>
+    /// Convenience: build a Streamax live-FLV URL from components and play it.
+    /// Library never holds a host or device id. <paramref name="expires"/> +
+    /// <paramref name="hash"/> come from the auth backend; pass 0 / "" to omit.
+    /// </summary>
+    public Task StreamAsync(
+        string host,
+        string uuid,
+        int port = 22060,
+        int channel = 1,
+        bool audio = true,
+        Quality quality = Quality.Main,
+        long expires = 0,
+        string hash = "")
+    {
+        var sb = new System.Text.StringBuilder()
+            .Append("devid=").Append(uuid)
+            .Append("&chl=").Append(channel)
+            .Append("&st=").Append((int)quality)
+            .Append("&audio=").Append(audio ? 1 : 0);
+        if (expires > 0)        sb.Append("&expires=").Append(expires);
+        if (!string.IsNullOrEmpty(hash)) sb.Append("&hash=").Append(hash);
+        return PlayAsync($"https://{host}:{port}/live.flv?{sb}");
+    }
+
+    public enum Quality { Sub = 0, Main = 1 }
 
     public void Stop()
     {
