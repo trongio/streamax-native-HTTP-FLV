@@ -75,18 +75,23 @@ The fastest way to confirm the recipe works against your camera:
 
 ```bash
 # 1. Build the Rust core
-cd core && cargo build --release --example flv_to_annex_b
+cd core && cargo build --release --examples
 
 # 2. Get a fresh URL from the PHP backend (DevTools → /request/dashcam_getstream)
 URL='https://<camera-host>:<port>/live.flv?devid=...&chl=1&st=1&audio=1&hash=anything'
 
-# 3. Stream it
+# 3a. Video only (raw HEVC Annex-B)
 curl -skN "$URL" \
   | target/release/examples/flv_to_annex_b \
   | mpv --demuxer=lavf --demuxer-lavf-format=hevc --profile=low-latency -
+
+# 3b. Video + audio (MPEG-TS multiplex)
+curl -skN "$URL" \
+  | target/release/examples/flv_to_ts \
+  | mpv --profile=low-latency -
 ```
 
-Stderr from `flv_to_annex_b` reports detected resolution, codec, frame count.
+Stderr reports detected resolution, codec, sample rate, and frame counts.
 
 ## Building per platform
 
@@ -104,24 +109,31 @@ Android Studio / Visual Studio.
 
 ## Production status
 
-| Feature                  | iOS | Android | Windows                  |
-| ------------------------ | --- | ------- | ------------------------ |
-| HEVC hardware decode     | ✅  | ✅      | ✅                       |
-| AAC audio                | ✅  | ✅      | ⚠️ Needs MPEG-TS muxer   |
-| Reconnect (exp backoff)  | ✅  | ✅      | ✅                       |
-| SPS-parsed dimensions    | ✅  | ✅      | ✅                       |
-| Cert pinning hook        | ✅  | ✅      | ✅                       |
-| A/V sync                 | ✅  | ⚠️      | n/a                      |
+| Feature                          | iOS | Android | Windows |
+| -------------------------------- | --- | ------- | ------- |
+| HEVC hardware decode             | ✅  | ✅      | ✅      |
+| AAC audio                        | ✅  | ✅      | ✅      |
+| Reconnect (exp backoff)          | ✅  | ✅      | ✅      |
+| SPS-parsed dimensions            | ✅  | ✅      | ✅      |
+| SPKI cert pinning (default-on)   | ✅  | ✅      | ✅      |
+| A/V sync                         | ✅  | ⚠️      | ✅      |
+| Multi-camera grid                | ✅  | ✅      | —       |
+| Picture-in-Picture               | ✅  | ✅      | —       |
+| CI builds (GitHub Actions)       | ✅  | ✅      | ✅      |
 
-See `docs/index.html` → "Production status" for the full checklist.
+See `docs/index.html` → "Production status" for the live checklist.
 
 ## Findings worth knowing about
 
-While building this we discovered two things on the server side worth fixing:
+While building this we discovered two things on the server side worth fixing.
+The PHP-side change is already applied; the camera-server side is documented
+in [`docs/backend-hmac.md`](docs/backend-hmac.md).
 
-1. **The `hash` URL parameter is fake.** `streamax_stream.php:34` generates a
-   random string of random length and the camera server doesn't validate it.
-   Anyone with a `devid` can stream forever. Replace with a real HMAC + TTL.
+1. **The `hash` URL parameter was fake.** `streamax_stream.php:34` used to call
+   `generateRandomString(rand(20,200))` and the camera server didn't validate.
+   The PHP side now generates a real HMAC-SHA256 with TTL when a secret is
+   configured; the camera server still ignores it (forward-compatible). When
+   the camera server learns to validate, no client code changes.
 
 2. **Mainline FFmpeg ≥ 7.0 still doesn't demux the HEVC-in-FLV variant.** Ours
    sometimes crashes (`ffprobe` segfault). The streams *can* be played — just

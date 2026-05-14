@@ -72,7 +72,7 @@
     <div class="relative max-w-6xl mx-auto px-6 py-20 lg:py-28">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink-800/80 border border-ink-700 text-xs text-slate-400 mb-6">
             <span class="w-1.5 h-1.5 rounded-full bg-signal-green animate-pulse"></span>
-            v0.1.0 — verified against live camera
+            v0.2.0 — production polish (TS mux, audio, PiP, multi-cam, CI)
         </div>
         <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6">
             <span class="gradient-text">streamax-native</span>
@@ -186,9 +186,9 @@
 
             <!-- Platforms -->
             <template x-for="p in [
-                { name: 'iOS', icon: '', detail: 'VideoToolbox + AVSampleBufferDisplayLayer + AVSampleBufferAudioRenderer', features: ['HEVC HW decode', 'AAC audio', 'Reconnect', 'SPKI pinning'] },
-                { name: 'Android', icon: '🤖', detail: 'MediaCodec + Surface + AudioTrack', features: ['HEVC HW decode', 'AAC audio', 'Reconnect', 'OkHttp pinning'] },
-                { name: 'Windows', icon: '🪟', detail: 'libVLC via LibVLCSharp.WPF', features: ['HEVC HW decode', 'Audio: TODO (MPEG-TS muxer)', 'Reconnect', 'SPKI pinning'] },
+                { name: 'iOS', icon: '', detail: 'VideoToolbox + AVSampleBufferDisplayLayer + AVSampleBufferAudioRenderer', features: ['HEVC HW decode', 'AAC audio', 'Reconnect', 'SPKI pinning', 'Multi-cam grid', 'Picture-in-Picture'] },
+                { name: 'Android', icon: '🤖', detail: 'MediaCodec + Surface + AudioTrack', features: ['HEVC HW decode', 'AAC audio', 'Reconnect', 'OkHttp pinning', 'Multi-cam grid', 'Picture-in-Picture'] },
+                { name: 'Windows', icon: '🪟', detail: 'libVLC via LibVLCSharp.WPF (MPEG-TS muxed input)', features: ['HEVC HW decode', 'AAC audio (TS-muxed)', 'Reconnect', 'SPKI pinning'] },
             ]" x-data>
                 <div class="rounded-xl bg-ink-850 border border-ink-700/60 p-6 hover:border-ink-600 transition">
                     <div class="flex items-center gap-3 mb-3">
@@ -232,7 +232,7 @@
     <!-- LINUX -->
     <div x-show="tab === 'linux'" x-cloak class="space-y-4">
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
-            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Build the Rust core + smoke-test binary</div>
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">1</span>Build the Rust core + both smoke-test binaries</div>
             <div x-data="copyBlock()" class="relative">
                 <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
                     class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
@@ -241,11 +241,25 @@
                     <span x-show="copied" x-cloak>Copied ✓</span>
                 </button>
                 <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">cd core
-cargo build --release --example flv_to_annex_b</code></pre>
+cargo build --release --examples</code></pre>
             </div>
         </div>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
-            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2</span>Get a fresh URL from your backend and stream it</div>
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2a</span>Video + audio via MPEG-TS multiplex (recommended)</div>
+            <div x-data="copyBlock()" class="relative">
+                <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
+                    class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
+                    :class="copied ? 'text-signal-green border-signal-green/40' : 'text-slate-400 hover:text-slate-200 hover:border-ink-600'">
+                    <span x-show="!copied">Copy</span>
+                    <span x-show="copied" x-cloak>Copied ✓</span>
+                </button>
+                <pre class="bg-ink-950 rounded p-4 pr-20 overflow-x-auto text-slate-300"><code x-ref="snippet">curl -skN 'https://&lt;camera-host&gt;:&lt;port&gt;/live.flv?devid=...&amp;hash=anything' \
+  | target/release/examples/flv_to_ts \
+  | mpv --profile=low-latency -</code></pre>
+            </div>
+        </div>
+        <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
+            <div class="text-sm text-slate-300 mb-3"><span class="text-slate-500 font-mono mr-2">2b</span>Video only (raw HEVC Annex-B)</div>
             <div x-data="copyBlock()" class="relative">
                 <button @click="copy($refs.snippet)" :title="copied ? 'Copied' : 'Copy to clipboard'"
                     class="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs font-medium bg-ink-800/80 border border-ink-700 transition"
@@ -261,7 +275,7 @@ cargo build --release --example flv_to_annex_b</code></pre>
         <div class="rounded-lg bg-ink-850 border border-ink-700/60 p-4">
             <div class="text-sm text-slate-300 mb-3">Expected stderr output</div>
             <pre class="bg-ink-950 rounded p-4 overflow-x-auto text-slate-400"><code>VideoConfig: 352x288, 74 bytes
-AudioConfig: 8000Hz 1ch
+AudioConfig: 8000Hz 1ch (object_type=2)
 done: 1 video cfg, 47 frames, 1 audio cfg, 35 audio frames</code></pre>
         </div>
     </div>
@@ -382,14 +396,16 @@ cd core
                 </thead>
                 <tbody x-data="{
                     rows: [
-                        { name: 'HEVC hardware decode',    a: 'ok', b: 'ok', c: 'ok' },
-                        { name: 'Shared Rust core',        a: 'ok', b: 'ok', c: 'ok' },
-                        { name: 'AAC audio',               a: 'ok', b: 'ok', c: 'todo' },
-                        { name: 'A/V sync',                a: 'ok', b: 'warn', c: 'na' },
-                        { name: 'Reconnect (exp backoff)', a: 'ok', b: 'ok', c: 'ok' },
-                        { name: 'SPS-parsed dimensions',   a: 'ok', b: 'ok', c: 'ok' },
-                        { name: 'SPKI cert pinning hook',  a: 'ok', b: 'ok', c: 'ok' },
-                        { name: 'PiP support',             a: 'todo', b: 'todo', c: 'na' },
+                        { name: 'HEVC hardware decode',     a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'Shared Rust core',         a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'AAC audio',                a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'A/V sync',                 a: 'ok', b: 'warn', c: 'ok' },
+                        { name: 'Reconnect (exp backoff)',  a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'SPS-parsed dimensions',    a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'SPKI pinning (default-on)',a: 'ok', b: 'ok', c: 'ok' },
+                        { name: 'Multi-camera grid',        a: 'ok', b: 'ok', c: 'todo' },
+                        { name: 'Picture-in-Picture',       a: 'ok', b: 'ok', c: 'na' },
+                        { name: 'CI builds (GitHub Actions)', a: 'ok', b: 'ok', c: 'ok' },
                     ]
                 }">
                     <template x-for="(row, i) in rows" :key="row.name">
@@ -408,7 +424,7 @@ cd core
                 </tbody>
             </table>
         </div>
-        <p class="text-sm text-slate-500 mt-4">Windows audio path requires an MPEG-TS muxer in the Rust core — the demuxer already extracts AAC frames, it's just not wired through to libVLC yet. ~2 days of work to add.</p>
+        <p class="text-sm text-slate-500 mt-4">Windows multi-camera grid and PiP are gated on WPF + libVLC ergonomics, not the core — single-camera audio + video works end-to-end through the MPEG-TS pipeline.</p>
     </div>
 </section>
 
@@ -421,13 +437,16 @@ cd core
     <div class="grid lg:grid-cols-2 gap-6">
         <div class="rounded-xl bg-ink-850 border border-ink-700/60 p-6">
             <div class="flex items-center gap-2 mb-3">
-                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-signal-red/10 text-signal-red border border-signal-red/30">Security</span>
-                <h3 class="text-lg font-bold text-slate-100">The URL hash is fake</h3>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-signal-green/10 text-signal-green border border-signal-green/30">Patched</span>
+                <h3 class="text-lg font-bold text-slate-100">The URL hash was fake</h3>
             </div>
-            <p class="text-sm text-slate-400 leading-relaxed mb-4">In <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">streamax_stream.php</code>:</p>
-            <pre class="bg-ink-950 rounded p-3 text-xs overflow-x-auto"><code><span class="text-slate-500">// line 34</span>
-<span class="text-pink-300">$hash</span> = <span class="text-accent-400">generateRandomString</span>(<span class="text-accent-400">rand</span>(<span class="text-amber-300">20</span>, <span class="text-amber-300">200</span>));</code></pre>
-            <p class="text-sm text-slate-400 leading-relaxed mt-4">The camera server doesn't validate this. Anyone with a <code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">devid</code> can stream forever. Replace with HMAC + TTL on the server side.</p>
+            <p class="text-sm text-slate-400 leading-relaxed mb-4"><code class="px-1.5 py-0.5 rounded bg-ink-800 text-accent-400 text-xs">streamax_stream.php</code> generated a meaningless random string as the URL signature:</p>
+            <pre class="bg-ink-950 rounded p-3 text-xs overflow-x-auto"><code><span class="text-slate-500">// before</span>
+<span class="text-pink-300">$hash</span> = <span class="text-accent-400">generateRandomString</span>(<span class="text-accent-400">rand</span>(<span class="text-amber-300">20</span>, <span class="text-amber-300">200</span>));
+
+<span class="text-slate-500">// after — HMAC + TTL, see docs/backend-hmac.md</span>
+<span class="text-pink-300">$hash</span> = <span class="text-accent-400">hash_hmac</span>(<span class="text-accent-400">"sha256"</span>, <span class="text-pink-300">$payload</span>, <span class="text-pink-300">$secret</span>);</code></pre>
+            <p class="text-sm text-slate-400 leading-relaxed mt-4">PHP side is now signing properly; camera server validation is the next step — design notes in <a href="backend-hmac.md" class="text-accent-400 hover:underline">backend-hmac.md</a>.</p>
         </div>
 
         <div class="rounded-xl bg-ink-850 border border-ink-700/60 p-6">
@@ -449,7 +468,7 @@ cd core
     <div class="max-w-6xl mx-auto px-6 py-10">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center gap-3 text-slate-500 text-sm">
-                <span class="font-mono">streamax-native v0.1.0</span>
+                <span class="font-mono">streamax-native v0.2.0</span>
                 <span>·</span>
                 <span>MIT License</span>
             </div>
